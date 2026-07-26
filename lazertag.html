@@ -852,6 +852,14 @@
                 <span class="key-cap">1 / 2 / 3</span>
                 <span class="ctrl-desc">Switch Weapons</span>
             </div>
+            <div class="ctrl-row">
+                <span class="key-cap">ALT + T</span>
+                <span class="ctrl-desc">Toggle Chat Input</span>
+            </div>
+            <div class="ctrl-row">
+                <span class="key-cap">ALT + X</span>
+                <span class="ctrl-desc">Leave Match to Menu</span>
+            </div>
         </div>
 
         <!-- Map Selector -->
@@ -1867,6 +1875,32 @@
         let mouseSensitivity = 0.0022; // Restored original fast mouse sensitivity
 
         window.addEventListener('keydown', (e) => {
+            // Alt + T: Toggle Chat Input Focus
+            if (e.altKey && (e.code === 'KeyT' || e.key === 't' || e.key === 'T')) {
+                e.preventDefault();
+                const chatInput = document.getElementById('chat-input');
+                if (chatInput) {
+                    if (document.activeElement === chatInput) {
+                        chatInput.blur();
+                        if (STATE.isPlaying) tryPointerLock();
+                    } else {
+                        document.exitPointerLock();
+                        chatInput.focus();
+                    }
+                }
+                return;
+            }
+
+            // Alt + X: Leave Match Back to Main Menu
+            if (e.altKey && (e.code === 'KeyX' || e.key === 'x' || e.key === 'X')) {
+                e.preventDefault();
+                if (typeof leaveMatch === 'function') leaveMatch();
+                return;
+            }
+
+            // Ignore gameplay keys while typing in input fields
+            if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+
             if (e.code === 'Space') e.preventDefault();
             keys[e.code] = true;
 

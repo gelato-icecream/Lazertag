@@ -751,11 +751,14 @@
     <div id="hud-container">
         <!-- Top Bar -->
         <div class="top-bar">
-            <div class="hud-card score-box">
-                <div class="score-title">ARENA SCORE</div>
-                <div class="score-value" id="hud-score">0</div>
-                <div class="wave-value" id="hud-wave">WAVE 1</div>
-                <div style="font-size:10px; color:#00f0ff; margin-top:4px; letter-spacing:1px; font-weight:700;" id="hud-map-name">TACTICAL FORTRESS</div>
+            <div style="display:flex; gap:12px; align-items:flex-start;">
+                <div class="hud-card score-box">
+                    <div class="score-title">ARENA SCORE</div>
+                    <div class="score-value" id="hud-score">0</div>
+                    <div class="wave-value" id="hud-wave">WAVE 1</div>
+                    <div style="font-size:10px; color:#00f0ff; margin-top:4px; letter-spacing:1px; font-weight:700;" id="hud-map-name">TACTICAL FORTRESS</div>
+                </div>
+                <button class="account-btn" id="leave-match-btn" style="background: rgba(255, 0, 85, 0.2); border-color: #ff0055; color: #ff0055; pointer-events:auto;">✕ LEAVE MATCH</button>
             </div>
             
             <div id="kill-feed"></div>
@@ -2624,6 +2627,37 @@
                 e.preventDefault();
                 e.stopPropagation();
                 startGame();
+            });
+        }
+
+        function leaveMatch() {
+            STATE.isPlaying = false;
+            document.exitPointerLock();
+
+            if (typeof roomSocket !== 'undefined' && roomSocket) {
+                roomSocket.close();
+                roomSocket = null;
+            }
+
+            if (typeof clearRemotePlayers === 'function') clearRemotePlayers();
+            bots.forEach(b => scene.remove(b.mesh));
+            bots.length = 0;
+            lasers.forEach(l => scene.remove(l.mesh));
+            lasers.length = 0;
+
+            document.getElementById('start-screen').classList.remove('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+
+            if (typeof fetchRoomList === 'function') fetchRoomList();
+            if (typeof fetchFriendsList === 'function') fetchFriendsList();
+        }
+
+        const leaveBtn = document.getElementById('leave-match-btn');
+        if (leaveBtn) {
+            leaveBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                leaveMatch();
             });
         }
 

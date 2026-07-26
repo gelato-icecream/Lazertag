@@ -928,6 +928,53 @@
         </div>
     </div>
 
+    <!-- Host Room Settings Modal -->
+    <div class="modal-overlay hidden" id="host-room-modal">
+        <div class="auth-card" style="width:360px;">
+            <div style="font-family:'Orbitron',sans-serif; font-size:16px; font-weight:800; color:#00f0ff; text-align:center;">HOST MULTIPLAYER ROOM</div>
+            
+            <label style="font-size:11px; color:#00f0ff; font-weight:700;">GAME MODE</label>
+            <select class="auth-input" id="host-game-mode">
+                <option value="ffa">Free For All (FFA)</option>
+                <option value="2team" selected>2 Teams (Cyan vs Magenta / Custom)</option>
+                <option value="3team">3 Teams (Tri-Faction)</option>
+                <option value="4team">4 Teams (Quad Arena)</option>
+            </select>
+
+            <label style="font-size:11px; color:#00f0ff; font-weight:700;">TEAM CAPACITY (PLAYERS / TEAM)</label>
+            <select class="auth-input" id="host-team-capacity">
+                <option value="2">2 Players / Team</option>
+                <option value="4" selected>4 Players / Team</option>
+                <option value="6">6 Players / Team</option>
+                <option value="8">8 Players / Team</option>
+            </select>
+
+            <label style="font-size:11px; color:#00f0ff; font-weight:700;">TEAM COLORS</label>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                <input type="color" class="auth-input" id="host-color-0" value="#00f0ff" title="Team 1 Color">
+                <input type="color" class="auth-input" id="host-color-1" value="#ff00aa" title="Team 2 Color">
+                <input type="color" class="auth-input" id="host-color-2" value="#ffe600" title="Team 3 Color">
+                <input type="color" class="auth-input" id="host-color-3" value="#00ff88" title="Team 4 Color">
+            </div>
+
+            <div style="display:flex; gap:8px; margin-top:8px;">
+                <button class="btn-action" style="flex:1; font-size:13px; padding:10px;" id="confirm-host-btn">LAUNCH ROOM</button>
+                <button class="btn-sm" id="close-host-btn">CANCEL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Team Selection Modal -->
+    <div class="modal-overlay hidden" id="team-select-modal">
+        <div class="auth-card" style="width:380px;">
+            <div style="font-family:'Orbitron',sans-serif; font-size:16px; font-weight:800; color:#00f0ff; text-align:center;">CHOOSE YOUR TEAM</div>
+            <div id="team-cards-container" style="display:flex; flex-direction:column; gap:8px;">
+                <!-- Dynamically populated team cards -->
+            </div>
+            <button class="btn-sm" style="margin-top:6px;" id="close-team-select-btn">CANCEL</button>
+        </div>
+    </div>
+
     <!-- Game Over Screen -->
     <div class="overlay-screen hidden" id="gameover-screen">
         <h1 class="game-title" style="background: linear-gradient(135deg, #ff0055, #ff5500); -webkit-background-clip: text;">SYSTEM DISABLING</h1>
@@ -1079,6 +1126,10 @@
             shotsFired: 0,
             shotsHit: 0,
             wave: 1,
+            mode: '2team',
+            teamId: 0,
+            teamColors: ['#00f0ff', '#ff00aa', '#ffe600', '#00ff88'],
+            teamCapacity: 4,
             player: {
                 health: 100,
                 shield: 100,
@@ -1770,7 +1821,7 @@
         const laserGeo = new THREE.CylinderGeometry(0.06, 0.06, 1.5, 8);
         laserGeo.rotateX(Math.PI / 2);
 
-        function createLaser(origin, dir, colorHex, speed, isPlayer = true, damage = 25) {
+        function createLaser(origin, dir, colorHex, speed, isPlayer = true, damage = 25, teamId = STATE.teamId) {
             const mat = new THREE.MeshBasicMaterial({ color: colorHex });
             const mesh = new THREE.Mesh(laserGeo, mat);
             mesh.position.copy(origin);
@@ -1783,6 +1834,7 @@
                 speed,
                 isPlayer,
                 damage,
+                teamId,
                 life: 2.5
             });
         }
@@ -1902,7 +1954,7 @@
             camera.getWorldDirection(dir);
             const origin = camera.position.clone().add(dir.clone().multiplyScalar(0.6));
 
-            createLaser(origin, dir, wpn.color, wpn.speed, true, wpn.damage);
+            createLaser(origin, dir, wpn.color, wpn.speed, true, wpn.damage, STATE.teamId);
 
             // Broadcast shooting event over WebSockets
             if (roomSocket && roomSocket.readyState === WebSocket.OPEN) {
@@ -1912,7 +1964,8 @@
                     dir: { x: dir.x, y: dir.y, z: dir.z },
                     color: wpn.color,
                     speed: wpn.speed,
-                    damage: wpn.damage
+                    damage: wpn.damage,
+                    team_id: STATE.teamId
                 }));
             }
         }
@@ -2085,8 +2138,9 @@
                         }
                     }
                 } else {
-                    // Check hit against player
-                    if (l.mesh.position.distanceTo(camera.position) < 1.2) {
+                    // Check hit against player (Friendly fire protection in team modes)
+                    const isFriendly = (STATE.mode !== 'ffa' && typeof l.teamId !== 'undefined' && l.teamId === STATE.teamId);
+                    if (!isFriendly && l.mesh.position.distanceTo(camera.position) < 1.2) {
                         damagePlayer(l.damage);
                         hit = true;
                     }
@@ -2364,20 +2418,59 @@
                 container.innerHTML = `<div style="font-size:11px; color:#94a3b8;">No active multiplayer rooms. Click Host Room!</div>`;
                 return;
             }
-            container.innerHTML = rooms.map(r => `
+            container.innerHTML = rooms.map(r => {
+                const modeLabel = (r.mode || "2team").toUpperCase();
+                const colorsJson = JSON.stringify(r.teamColors || ['#00f0ff', '#ff00aa']).replace(/"/g, '&quot;');
+                return `
                 <div class="room-item">
                     <div>
                         <span style="font-weight:700; color:#00f0ff;">${r.host}'s Room</span>
-                        <span style="font-size:10px; color:#94a3b8; margin-left:6px;">(${r.map.toUpperCase()})</span>
+                        <span style="font-size:10px; color:#94a3b8; margin-left:4px;">[${modeLabel}]</span>
                     </div>
-                    <button class="btn-sm" onclick="joinMultiplayerRoom('${r.roomId}', '${r.map}')">JOIN (${r.playerCount})</button>
+                    <button class="btn-sm" onclick="promptTeamSelection('${r.roomId}', '${r.map}', '${r.mode}', ${colorsJson}, ${r.teamCapacity || 4})">JOIN (${r.playerCount})</button>
                 </div>
-            `).join("");
+            `}).join("");
         }
 
-        function joinMultiplayerRoom(roomId, mapId) {
+        function promptTeamSelection(roomId, mapId, mode, colors, capacity) {
+            if (mode === "ffa") {
+                joinMultiplayerRoom(roomId, mapId, mode, 0, colors, capacity);
+                return;
+            }
+
+            const modal = document.getElementById("team-select-modal");
+            const container = document.getElementById("team-cards-container");
+            if (!modal || !container) return;
+
+            const teamNames = ["CYAN TEAM", "MAGENTA TEAM", "YELLOW TEAM", "GREEN TEAM"];
+            const teamColorsList = colors && colors.length ? colors : ["#00f0ff", "#ff00aa", "#ffe600", "#00ff88"];
+            const numTeams = mode === "3team" ? 3 : (mode === "4team" ? 4 : 2);
+
+            let html = "";
+            for (let i = 0; i < numTeams; i++) {
+                const c = teamColorsList[i] || "#00f0ff";
+                const name = teamNames[i] || `TEAM ${i+1}`;
+                const cJson = JSON.stringify(teamColorsList).replace(/"/g, '&quot;');
+                html += `
+                    <div style="background:rgba(255,255,255,0.06); border:1px solid ${c}; border-radius:6px; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-family:'Orbitron',sans-serif; font-size:13px; font-weight:800; color:${c};">${name}</span>
+                        <button class="btn-sm" style="background:${c}; color:#050a15;" onclick="joinMultiplayerRoom('${roomId}', '${mapId}', '${mode}', ${i}, ${cJson}, ${capacity}); document.getElementById('team-select-modal').classList.add('hidden');">JOIN TEAM</button>
+                    </div>
+                `;
+            }
+            container.innerHTML = html;
+            modal.classList.remove("hidden");
+        }
+
+        window.promptTeamSelection = promptTeamSelection;
+
+        function joinMultiplayerRoom(roomId, mapId, mode = "2team", teamId = 0, teamColors = ["#00f0ff", "#ff00aa"], capacity = 4) {
             currentRoomId = roomId;
             STATE.selectedMap = mapId;
+            STATE.mode = mode;
+            STATE.teamId = teamId;
+            STATE.teamColors = teamColors;
+            STATE.teamCapacity = capacity;
             selectMap(mapId);
 
             if (roomSocket) {
@@ -2392,11 +2485,12 @@
             }
 
             try {
-                const wsUrl = `${WS_BASE}/ws/room/${roomId}/${localPlayerId}/${encodeURIComponent(localUser.username)}/${mapId}`;
+                const encodedColors = encodeURIComponent(teamColors.join(","));
+                const wsUrl = `${WS_BASE}/ws/room/${roomId}/${localPlayerId}/${encodeURIComponent(localUser.username)}/${mapId}?mode=${mode}&team_id=${teamId}&capacity=${capacity}&colors=${encodedColors}`;
                 roomSocket = new WebSocket(wsUrl);
 
                 roomSocket.onopen = () => {
-                    appendChatMessage("ROOM", "SYSTEM", `Joined Room ${roomId} (${mapId.toUpperCase()})`);
+                    appendChatMessage("ROOM", "SYSTEM", `Joined Room ${roomId} (${mode.toUpperCase()} - ${mapId.toUpperCase()})`);
                     startGame();
                 };
 
@@ -2420,11 +2514,11 @@
             const type = msg.type;
 
             if (type === "pos") {
-                updateRemotePlayerTransform(msg.playerId, msg.username, msg.x, msg.y, msg.z, msg.yaw, msg.pitch);
+                updateRemotePlayerTransform(msg.playerId, msg.username, msg.x, msg.y, msg.z, msg.yaw, msg.pitch, msg.team_id || 0);
             } else if (type === "shoot") {
                 const origin = new THREE.Vector3(msg.origin.x, msg.origin.y, msg.origin.z);
                 const dir = new THREE.Vector3(msg.dir.x, msg.dir.y, msg.dir.z);
-                createLaser(origin, dir, msg.color || 0x00f0ff, msg.speed || 90, false, msg.damage || 25);
+                createLaser(origin, dir, msg.color || 0x00f0ff, msg.speed || 90, false, msg.damage || 25, msg.team_id || 0);
                 audio.playShoot('pulse');
             } else if (type === "player_left") {
                 removeRemotePlayer(msg.playerId);
@@ -2434,10 +2528,11 @@
             }
         }
 
-        function updateRemotePlayerTransform(pId, pName, x, y, z, yawVal, pitchVal) {
+        function updateRemotePlayerTransform(pId, pName, x, y, z, yawVal, pitchVal, teamId = 0) {
+            const teamHex = (STATE.teamColors && STATE.teamColors[teamId]) ? STATE.teamColors[teamId] : "#00f0ff";
             if (!remotePlayers[pId]) {
                 const pGroup = new THREE.Group();
-                const pMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x00f0ff, emissiveIntensity: 1.5, roughness: 0.2 });
+                const pMat = new THREE.MeshStandardMaterial({ color: teamHex, emissive: teamHex, emissiveIntensity: 1.5, roughness: 0.2 });
                 const body = new THREE.Mesh(new THREE.BoxGeometry(0.65, 1.4, 0.4), pMat);
                 body.position.y = 0.9;
                 pGroup.add(body);
@@ -2446,7 +2541,7 @@
                 head.position.y = 1.7;
                 pGroup.add(head);
 
-                const light = new THREE.PointLight(0x00f0ff, 2, 10);
+                const light = new THREE.PointLight(teamHex, 2, 10);
                 light.position.y = 1.4;
                 pGroup.add(light);
 
@@ -2456,6 +2551,7 @@
                 remotePlayers[pId] = {
                     mesh: pGroup,
                     username: pName,
+                    teamId: teamId,
                     targetPos: new THREE.Vector3(x, y - 1.6, z),
                     targetYaw: yawVal
                 };
@@ -2564,8 +2660,44 @@
             const createRoomBtn = document.getElementById("create-room-btn");
             if (createRoomBtn) {
                 createRoomBtn.addEventListener("click", () => {
+                    const hostModal = document.getElementById("host-room-modal");
+                    if (hostModal) hostModal.classList.remove("hidden");
+                });
+            }
+
+            const closeHostBtn = document.getElementById("close-host-btn");
+            if (closeHostBtn) {
+                closeHostBtn.addEventListener("click", () => {
+                    document.getElementById("host-room-modal").classList.add("hidden");
+                });
+            }
+
+            const confirmHostBtn = document.getElementById("confirm-host-btn");
+            if (confirmHostBtn) {
+                confirmHostBtn.addEventListener("click", () => {
+                    const mode = document.getElementById("host-game-mode").value;
+                    const capacity = parseInt(document.getElementById("host-team-capacity").value, 10);
+                    const colors = [
+                        document.getElementById("host-color-0").value,
+                        document.getElementById("host-color-1").value,
+                        document.getElementById("host-color-2").value,
+                        document.getElementById("host-color-3").value
+                    ];
                     const newRoomId = "room_" + Math.random().toString(36).substr(2, 6);
-                    joinMultiplayerRoom(newRoomId, STATE.selectedMap || "fortress");
+                    document.getElementById("host-room-modal").classList.add("hidden");
+
+                    if (mode === "ffa") {
+                        joinMultiplayerRoom(newRoomId, STATE.selectedMap || "fortress", mode, 0, colors, capacity);
+                    } else {
+                        promptTeamSelection(newRoomId, STATE.selectedMap || "fortress", mode, colors, capacity);
+                    }
+                });
+            }
+
+            const closeTeamSelectBtn = document.getElementById("close-team-select-btn");
+            if (closeTeamSelectBtn) {
+                closeTeamSelectBtn.addEventListener("click", () => {
+                    document.getElementById("team-select-modal").classList.add("hidden");
                 });
             }
 

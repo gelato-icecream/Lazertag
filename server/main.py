@@ -201,14 +201,26 @@ async def websocket_global(websocket: WebSocket):
         manager.disconnect_global(websocket)
 
 @app.websocket("/ws/room/{room_id}/{player_id}/{username}/{selected_map}")
-async def websocket_room(websocket: WebSocket, room_id: str, player_id: str, username: str, selected_map: str):
-    await manager.join_room(room_id, player_id, username, selected_map, websocket)
+async def websocket_room(
+    websocket: WebSocket,
+    room_id: str,
+    player_id: str,
+    username: str,
+    selected_map: str,
+    mode: str = "2team",
+    team_id: int = 0,
+    colors: str = "#00f0ff,#ff00aa",
+    capacity: int = 4
+):
+    team_colors = [c.strip() for c in colors.split(",") if c.strip()]
+    await manager.join_room(room_id, player_id, username, selected_map, mode, team_id, team_colors, capacity, websocket)
     
-    # Broadcast current room list of players to newly connected player
+    room_meta = manager.active_rooms.get(room_id, {}).get("meta", {})
     existing_players = manager.get_room_players(room_id)
     await websocket.send_text(json.dumps({
         "type": "room_state",
         "map": selected_map,
+        "meta": room_meta,
         "players": existing_players
     }))
 

@@ -1,0 +1,2687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYBER-TAG 3D // Laser Tag Arena</title>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #05050a;
+            font-family: 'Rajdhani', sans-serif;
+            color: #fff;
+        }
+
+        #game-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* HUD LAYOUT */
+        #hud-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            z-index: 10;
+        }
+
+        /* Top HUD */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            width: 100%;
+        }
+
+        .hud-card {
+            background: rgba(10, 15, 30, 0.65);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.15), inset 0 0 10px rgba(0, 240, 255, 0.05);
+            backdrop-filter: blur(8px);
+            border-radius: 8px;
+            padding: 12px 20px;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .score-box {
+            text-align: center;
+        }
+
+        .score-title {
+            font-size: 11px;
+            color: #00f0ff;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .score-value {
+            font-size: 28px;
+            font-weight: 900;
+            color: #ffffff;
+            text-shadow: 0 0 10px #00f0ff;
+        }
+
+        .wave-value {
+            font-size: 16px;
+            color: #ff0055;
+            text-shadow: 0 0 8px #ff0055;
+        }
+
+        /* Kill Feed */
+        #kill-feed {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+            max-width: 320px;
+        }
+
+        .kill-entry {
+            background: rgba(255, 0, 85, 0.2);
+            border-right: 3px solid #ff0055;
+            padding: 6px 12px;
+            font-size: 13px;
+            border-radius: 4px 0 0 4px;
+            animation: fadeIn 0.3s ease-out;
+            color: #ffe6ee;
+            font-weight: 600;
+        }
+
+        .kill-entry.player-kill {
+            background: rgba(0, 240, 255, 0.2);
+            border-right-color: #00f0ff;
+            color: #e6ffff;
+        }
+
+        /* Center Crosshair */
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 24px;
+            height: 24px;
+            pointer-events: none;
+        }
+
+        #crosshair::before, #crosshair::after {
+            content: '';
+            position: absolute;
+            background: #00f0ff;
+            box-shadow: 0 0 6px #00f0ff;
+        }
+
+        #crosshair::before {
+            top: 11px;
+            left: 0;
+            width: 24px;
+            height: 2px;
+        }
+
+        #crosshair::after {
+            top: 0;
+            left: 11px;
+            width: 2px;
+            height: 24px;
+        }
+
+        .crosshair-dot {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 4px;
+            height: 4px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #fff;
+        }
+
+        #hit-marker {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(45deg);
+            width: 28px;
+            height: 28px;
+            opacity: 0;
+            transition: opacity 0.08s ease;
+            pointer-events: none;
+        }
+
+        #hit-marker::before, #hit-marker::after {
+            content: '';
+            position: absolute;
+            background: #ff0055;
+            box-shadow: 0 0 10px #ff0055;
+        }
+
+        #hit-marker::before {
+            top: 13px; left: 0; width: 28px; height: 2px;
+        }
+        #hit-marker::after {
+            top: 0; left: 13px; width: 2px; height: 28px;
+        }
+
+        /* Bottom HUD */
+        .bottom-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+        }
+
+        .vitals-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 280px;
+        }
+
+        .bar-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .bar-label {
+            font-size: 11px;
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .bar-track {
+            width: 100%;
+            height: 12px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .bar-fill {
+            height: 100%;
+            width: 100%;
+            transition: width 0.15s ease-out;
+            border-radius: 4px;
+        }
+
+        #shield-fill {
+            background: linear-gradient(90deg, #0088ff, #00f0ff);
+            box-shadow: 0 0 12px #00f0ff;
+        }
+
+        #health-fill {
+            background: linear-gradient(90deg, #ff0055, #ff5500);
+            box-shadow: 0 0 12px #ff0055;
+        }
+
+        /* Minimap Canvas */
+        #minimap-container {
+            width: 150px;
+            height: 150px;
+            border: 2px solid rgba(0, 240, 255, 0.4);
+            border-radius: 50%;
+            overflow: hidden;
+            background: rgba(5, 10, 25, 0.85);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+            position: relative;
+        }
+
+        #minimap {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Weapon Display */
+        .weapon-box {
+            text-align: right;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .weapon-name {
+            font-size: 18px;
+            font-weight: 800;
+            color: #00f0ff;
+            text-shadow: 0 0 8px #00f0ff;
+        }
+
+        .ammo-count {
+            font-size: 32px;
+            font-weight: 900;
+            color: #ffffff;
+            text-shadow: 0 0 10px #ffffff;
+        }
+
+        .weapon-selector {
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+            justify-content: flex-end;
+        }
+
+        .wpn-slot {
+            width: 24px;
+            height: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .wpn-slot.active {
+            border-color: #00f0ff;
+            color: #00f0ff;
+            box-shadow: 0 0 8px #00f0ff;
+            background: rgba(0, 240, 255, 0.2);
+        }
+
+        /* Crouch Indicator */
+        #stance-indicator {
+            position: absolute;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            letter-spacing: 2px;
+            color: rgba(0, 240, 255, 0.8);
+            background: rgba(0, 240, 255, 0.1);
+            padding: 4px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        #stance-indicator.visible {
+            opacity: 1;
+        }
+
+        /* OVERLAYS & MENUS */
+        .overlay-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 5, 15, 0.88);
+            backdrop-filter: blur(12px);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            padding: 20px;
+            overflow-y: auto;
+            pointer-events: auto !important;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .game-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 42px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #00f0ff, #ff0055);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 25px rgba(0, 240, 255, 0.4);
+            letter-spacing: 3px;
+            text-align: center;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: #8a99ad;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-top: -10px;
+        }
+
+        .controls-card {
+            background: rgba(15, 25, 45, 0.7);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            border-radius: 12px;
+            padding: 14px 28px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px 28px;
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.15);
+            max-width: 680px;
+            width: 100%;
+        }
+
+        .ctrl-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .key-cap {
+            background: linear-gradient(180deg, #1e293b, #0f172a);
+            border: 1px solid #00f0ff;
+            box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+            color: #00f0ff;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            min-width: 32px;
+            text-align: center;
+        }
+
+        .ctrl-desc {
+            font-size: 13px;
+            color: #cbd5e1;
+        }
+
+        .btn-action {
+            background: linear-gradient(135deg, #00f0ff, #0088ff);
+            color: #050a15;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            font-size: 18px;
+            letter-spacing: 2px;
+            padding: 14px 42px;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.5);
+            transition: all 0.2s ease;
+            pointer-events: auto;
+            margin-top: 4px;
+        }
+
+        .btn-action:hover {
+            transform: scale(1.06);
+            box-shadow: 0 0 40px rgba(0, 240, 255, 0.8);
+            background: linear-gradient(135deg, #33f3ff, #00aaff);
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin: 10px 0;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 16px 24px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-num {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 32px;
+            font-weight: 800;
+            color: #00f0ff;
+        }
+
+        .stat-lbl {
+            font-size: 12px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* MAP SELECTION UI */
+        .map-select-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            max-width: 680px;
+        }
+
+        .map-select-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            letter-spacing: 2px;
+            color: #00f0ff;
+            text-transform: uppercase;
+        }
+
+        .map-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            width: 100%;
+        }
+
+        .map-card {
+            background: rgba(15, 25, 45, 0.75);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            border-radius: 8px;
+            padding: 12px 10px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.1);
+            pointer-events: auto;
+        }
+
+        .map-card:hover {
+            border-color: #00f0ff;
+            box-shadow: 0 0 18px rgba(0, 240, 255, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .map-card.active {
+            background: rgba(0, 240, 255, 0.18);
+            border-color: #00f0ff;
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.5), inset 0 0 10px rgba(0, 240, 255, 0.2);
+        }
+
+        .map-card-name {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            font-weight: 800;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+
+        .map-card.active .map-card-name {
+            color: #00f0ff;
+            text-shadow: 0 0 8px #00f0ff;
+        }
+
+        /* MULTIPLAYER & SERVER STATUS STYLES */
+        .server-status-badge {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            letter-spacing: 1px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 240, 255, 0.4);
+            background: rgba(0, 240, 255, 0.1);
+            color: #00f0ff;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .server-status-badge.online {
+            color: #00ff88;
+            border-color: rgba(0, 255, 136, 0.4);
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .account-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            pointer-events: auto;
+        }
+
+        .account-btn {
+            background: rgba(0, 240, 255, 0.15);
+            border: 1px solid #00f0ff;
+            color: #00f0ff;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .account-btn:hover {
+            background: rgba(0, 240, 255, 0.3);
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+        }
+
+        /* LOBBY & FRIENDS GRID */
+        .lobby-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            width: 100%;
+            max-width: 680px;
+        }
+
+        .panel-box {
+            background: rgba(10, 18, 35, 0.85);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 180px;
+            overflow-y: auto;
+            pointer-events: auto;
+        }
+
+        .panel-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            color: #00f0ff;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+            padding-bottom: 4px;
+        }
+
+        .room-item, .friend-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .btn-sm {
+            background: #00f0ff;
+            color: #050a15;
+            border: none;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn-sm:hover {
+            background: #33f3ff;
+            box-shadow: 0 0 8px #00f0ff;
+        }
+
+        /* CHATBOX UI */
+        #chat-container {
+            position: absolute;
+            bottom: 180px;
+            left: 20px;
+            width: 320px;
+            background: rgba(5, 10, 25, 0.85);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 50;
+            pointer-events: auto;
+            backdrop-filter: blur(8px);
+        }
+
+        .chat-tabs {
+            display: flex;
+            gap: 6px;
+        }
+
+        .chat-tab {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px;
+            color: #94a3b8;
+            padding: 2px 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .chat-tab.active {
+            color: #00f0ff;
+            background: rgba(0, 240, 255, 0.2);
+            border: 1px solid rgba(0, 240, 255, 0.4);
+        }
+
+        #chat-messages {
+            height: 100px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 11px;
+        }
+
+        .chat-msg {
+            color: #e2e8f0;
+            line-height: 1.3;
+            word-break: break-word;
+        }
+
+        .chat-msg .sender {
+            color: #00f0ff;
+            font-weight: 700;
+        }
+
+        .chat-input-row {
+            display: flex;
+            gap: 6px;
+        }
+
+        #chat-input {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            border-radius: 4px;
+            color: #fff;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-family: 'Rajdhani', sans-serif;
+        }
+
+        /* AUTH MODAL OVERLAY */
+        .modal-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+        }
+
+        .auth-card {
+            background: rgba(10, 18, 35, 0.95);
+            border: 1px solid #00f0ff;
+            border-radius: 12px;
+            padding: 24px;
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.4);
+        }
+
+        .auth-input {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(0, 240, 255, 0.4);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: #fff;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 14px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- In-Game HUD -->
+    <div id="hud-container">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="hud-card score-box">
+                <div class="score-title">ARENA SCORE</div>
+                <div class="score-value" id="hud-score">0</div>
+                <div class="wave-value" id="hud-wave">WAVE 1</div>
+                <div style="font-size:10px; color:#00f0ff; margin-top:4px; letter-spacing:1px; font-weight:700;" id="hud-map-name">TACTICAL FORTRESS</div>
+            </div>
+            
+            <div id="kill-feed"></div>
+        </div>
+
+        <!-- Dynamic Stance Indicator -->
+        <div id="stance-indicator">CROUCHING [SHIFT]</div>
+
+        <!-- Crosshair & Hit Marker -->
+        <div id="crosshair">
+            <div class="crosshair-dot"></div>
+        </div>
+        <div id="hit-marker"></div>
+
+        <!-- Bottom Bar -->
+        <div class="bottom-bar">
+            <!-- Health & Shield -->
+            <div class="hud-card vitals-container">
+                <div class="bar-wrapper">
+                    <div class="bar-label">
+                        <span>ENERGY SHIELD</span>
+                        <span id="shield-text">100</span>
+                    </div>
+                    <div class="bar-track">
+                        <div class="bar-fill" id="shield-fill"></div>
+                    </div>
+                </div>
+                <div class="bar-wrapper">
+                    <div class="bar-label">
+                        <span>HEALTH CORE</span>
+                        <span id="health-text">100</span>
+                    </div>
+                    <div class="bar-track">
+                        <div class="bar-fill" id="health-fill"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Minimap -->
+            <div id="minimap-container">
+                <canvas id="minimap" width="150" height="150"></canvas>
+            </div>
+
+            <!-- Weapon Status -->
+            <div class="hud-card weapon-box">
+                <div class="weapon-name" id="weapon-name">PULSE BLASTER</div>
+                <div class="ammo-count"><span id="ammo-current">30</span> / <span id="ammo-max">∞</span></div>
+                <div class="weapon-selector">
+                    <div class="wpn-slot active" id="slot-1">1</div>
+                    <div class="wpn-slot" id="slot-2">2</div>
+                    <div class="wpn-slot" id="slot-3">3</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Start Screen Overlay -->
+    <div class="overlay-screen" id="start-screen">
+        <!-- Account Status & Server Indicator -->
+        <div class="account-bar">
+            <span class="server-status-badge" id="server-status-badge">● CHECKING SERVER...</span>
+            <span id="account-info" style="font-family:'Orbitron',sans-serif; font-size:12px; color:#fff;">GUEST PLAYER</span>
+            <button class="account-btn" id="open-auth-btn">LOGIN / REGISTER</button>
+        </div>
+
+        <h1 class="game-title">CYBER-TAG 3D</h1>
+        <div class="subtitle">NEON ARENA LASER BATTLE</div>
+
+        <div class="controls-card">
+            <div class="ctrl-row">
+                <span class="key-cap">WASD</span>
+                <span class="ctrl-desc">Move Player</span>
+            </div>
+            <div class="ctrl-row">
+                <span class="key-cap">MOUSE</span>
+                <span class="ctrl-desc">Aim & Look Around</span>
+            </div>
+            <div class="ctrl-row">
+                <span class="key-cap">LEFT CLICK</span>
+                <span class="ctrl-desc">Fire Laser Blaster</span>
+            </div>
+            <div class="ctrl-row">
+                <span class="key-cap">SHIFT</span>
+                <span class="ctrl-desc">Crouch / Stealth</span>
+            </div>
+            <div class="ctrl-row">
+                <span class="key-cap">SPACE</span>
+                <span class="ctrl-desc">Jump</span>
+            </div>
+            <div class="ctrl-row">
+                <span class="key-cap">1 / 2 / 3</span>
+                <span class="ctrl-desc">Switch Weapons</span>
+            </div>
+        </div>
+
+        <!-- Map Selector -->
+        <div class="map-select-container">
+            <div class="map-select-title">// SELECT COMBAT MAP //</div>
+            <div class="map-grid">
+                <div class="map-card active" id="map-btn-fortress" data-map="fortress">
+                    <div class="map-card-name">TACTICAL FORTRESS</div>
+                    <div class="map-card-desc">Multi-Level Platforms, Sniper Towers & Bunkers</div>
+                </div>
+                <div class="map-card" id="map-btn-labyrinth" data-map="labyrinth">
+                    <div class="map-card-name">CYBER LABYRINTH</div>
+                    <div class="map-card-desc">Dense Hiding Maze & High Skywalk Bridges</div>
+                </div>
+                <div class="map-card" id="map-btn-open" data-map="open">
+                    <div class="map-card-name">NEON ARENA</div>
+                    <div class="map-card-desc">Classic Open Grid & Central Pillars</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lobby Rooms & Friends Panel -->
+        <div class="lobby-grid">
+            <div class="panel-box">
+                <div class="panel-title">
+                    <span>MULTIPLAYER ROOMS</span>
+                    <button class="btn-sm" id="create-room-btn">+ HOST ROOM</button>
+                </div>
+                <div id="room-list">
+                    <div style="font-size:11px; color:#94a3b8;">No active multiplayer rooms. Click Host Room!</div>
+                </div>
+            </div>
+
+            <div class="panel-box">
+                <div class="panel-title">
+                    <span>FRIENDS LIST</span>
+                    <button class="btn-sm" id="add-friend-btn">+ ADD</button>
+                </div>
+                <div id="friends-list">
+                    <div style="font-size:11px; color:#94a3b8;">Sign in to view online friends.</div>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn-action" id="start-btn">ENTER ARENA</button>
+    </div>
+
+    <!-- Real-Time Chat Box -->
+    <div id="chat-container">
+        <div class="chat-tabs">
+            <div class="chat-tab active" id="tab-global">GLOBAL</div>
+            <div class="chat-tab" id="tab-room">ROOM</div>
+        </div>
+        <div id="chat-messages">
+            <div class="chat-msg"><span class="sender">SYSTEM:</span> Welcome to CYBER-TAG 3D! Press T or ENTER to chat.</div>
+        </div>
+        <div class="chat-input-row">
+            <input type="text" id="chat-input" placeholder="Type message... [ENTER]" maxlength="200">
+            <button class="btn-sm" id="chat-send-btn">SEND</button>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div class="modal-overlay hidden" id="auth-modal">
+        <div class="auth-card">
+            <div style="font-family:'Orbitron',sans-serif; font-size:16px; font-weight:800; color:#00f0ff; text-align:center;" id="auth-title">PLAYER SIGN IN</div>
+            <input type="text" class="auth-input" id="auth-username" placeholder="Username (3-20 chars)">
+            <input type="password" class="auth-input" id="auth-password" placeholder="Password">
+            <div style="display:flex; gap:8px; margin-top:6px;">
+                <button class="btn-action" style="flex:1; font-size:14px; padding:10px;" id="auth-submit-login">LOGIN</button>
+                <button class="btn-action" style="flex:1; font-size:14px; padding:10px; background:linear-gradient(135deg,#ff0055,#ff5500);" id="auth-submit-reg">REGISTER</button>
+            </div>
+            <button class="btn-sm" style="margin-top:4px;" id="close-auth-btn">CANCEL</button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div class="overlay-screen hidden" id="gameover-screen">
+        <h1 class="game-title" style="background: linear-gradient(135deg, #ff0055, #ff5500); -webkit-background-clip: text;">SYSTEM DISABLING</h1>
+        <div class="subtitle">TAGGED OUT IN THE NEON ARENA</div>
+
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-num" id="end-tags">0</div>
+                <div class="stat-lbl">Bots Tagged</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num" id="end-score">0</div>
+                <div class="stat-lbl">Final Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num" id="end-acc">0%</div>
+                <div class="stat-lbl">Accuracy</div>
+            </div>
+        </div>
+
+        <button class="btn-action" id="restart-btn">RESPAWN</button>
+    </div>
+
+    <script>
+        /* -------------------------------------------------------------
+         * SOUND SYNTHESIZER (Web Audio API)
+         * ------------------------------------------------------------- */
+        class SoundSynth {
+            constructor() {
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            playShoot(type = 'pulse') {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                if (type === 'pulse') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(880, now);
+                    osc.frequency.exponentialRampToValueAtTime(110, now + 0.12);
+
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+
+                    osc.start(now);
+                    osc.stop(now + 0.12);
+                } else if (type === 'plasma') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(60, now + 0.3);
+
+                    gain.gain.setValueAtTime(0.4, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'beam') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(1200, now);
+                    osc.frequency.exponentialRampToValueAtTime(400, now + 0.15);
+
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                }
+            }
+
+            playHitMarker() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(1200, now);
+                osc.frequency.setValueAtTime(1800, now + 0.03);
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            }
+
+            playExplosion() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(30, now + 0.4);
+
+                gain.gain.setValueAtTime(0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            }
+
+            playHurt() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+        }
+
+        const audio = new SoundSynth();
+
+        /* -------------------------------------------------------------
+         * GAME STATE & CONSTANTS
+         * ------------------------------------------------------------- */
+        const ARENA_SIZE = 120;
+        const WALL_HEIGHT = 10;
+
+        const STATE = {
+            isPlaying: false,
+            score: 0,
+            tags: 0,
+            shotsFired: 0,
+            shotsHit: 0,
+            wave: 1,
+            player: {
+                health: 100,
+                shield: 100,
+                pos: new THREE.Vector3(0, 1.6, 0),
+                vel: new THREE.Vector3(),
+                isGrounded: true,
+                isCrouching: false,
+                height: 1.6,
+                targetHeight: 1.6
+            },
+            currentWeapon: 1,
+            weapons: {
+                1: { name: 'PULSE BLASTER', type: 'pulse', damage: 25, cd: 150, color: 0x00f0ff, speed: 90, lastFired: 0, ammo: 30, maxAmmo: 30, energyCost: 1 },
+                2: { name: 'PLASMA CANNON', type: 'plasma', damage: 60, cd: 450, color: 0xff0055, speed: 45, lastFired: 0, ammo: 10, maxAmmo: 10, energyCost: 1 },
+                3: { name: 'HYPER BEAM', type: 'beam', damage: 40, cd: 250, color: 0x33ff55, speed: 200, lastFired: 0, ammo: 20, maxAmmo: 20, energyCost: 1 }
+            }
+        };
+
+        /* -------------------------------------------------------------
+         * THREE.JS SETUP
+         * ------------------------------------------------------------- */
+        const canvas = document.getElementById('game-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050714);
+        scene.fog = new THREE.FogExp2(0x050714, 0.018);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
+        camera.rotation.order = 'YXZ'; // Critical: Prevents camera from tilting sideways when looking straight down/up
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x1a2640, 1.2);
+        scene.add(ambientLight);
+
+        const mainDirLight = new THREE.DirectionalLight(0x00f0ff, 0.8);
+        mainDirLight.position.set(30, 50, 20);
+        scene.add(mainDirLight);
+
+        const subDirLight = new THREE.DirectionalLight(0xff0055, 0.5);
+        subDirLight.position.set(-30, 50, -20);
+        scene.add(subDirLight);
+
+        /* -------------------------------------------------------------
+         * ENVIRONMENT & ARENA MULTI-MAP BUILDER
+         * ------------------------------------------------------------- */
+        const obstacles = [];
+        const mapMeshes = [];
+        const coverPoints = [];
+
+        function tryPointerLock() {
+            try {
+                const p = document.body.requestPointerLock();
+                if (p && typeof p.catch === 'function') {
+                    p.catch(() => {});
+                }
+            } catch (err) {}
+        }
+
+        window.selectMap = function(mapId) {
+            STATE.selectedMap = mapId;
+            document.querySelectorAll('.map-card').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.getElementById(`map-btn-${mapId}`);
+            if (activeBtn) activeBtn.classList.add('active');
+            buildArena(mapId);
+        };
+
+        function buildArena(mapType = STATE.selectedMap || 'fortress') {
+            // Clean up previous map objects
+            mapMeshes.forEach(m => scene.remove(m));
+            mapMeshes.length = 0;
+            obstacles.length = 0;
+            coverPoints.length = 0;
+
+            // Update HUD Map Label
+            const mapNames = {
+                fortress: 'TACTICAL FORTRESS',
+                labyrinth: 'CYBER LABYRINTH',
+                open: 'NEON ARENA'
+            };
+            const hudMapName = document.getElementById('hud-map-name');
+            if (hudMapName) hudMapName.innerText = mapNames[mapType] || 'TACTICAL FORTRESS';
+
+            // Materials
+            const pillarMat = new THREE.MeshStandardMaterial({ color: 0x111c38, roughness: 0.3, metalness: 0.7 });
+            const platformMat = new THREE.MeshStandardMaterial({ color: 0x162244, roughness: 0.2, metalness: 0.8 });
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x0b1329, roughness: 0.5 });
+            const borderGlowMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+            const cyanGlow = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+            const magentaGlow = new THREE.MeshBasicMaterial({ color: 0xff0055 });
+            const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+
+            function addMapMesh(mesh) {
+                scene.add(mesh);
+                mapMeshes.push(mesh);
+            }
+
+            function addObstacleBox(x, y, z, sx, sy, sz, glowColor = null, mat = pillarMat) {
+                const mesh = new THREE.Mesh(boxGeo, mat);
+                mesh.scale.set(sx, sy, sz);
+                mesh.position.set(x, y + sy / 2, z);
+                addMapMesh(mesh);
+                obstacles.push(new THREE.Box3().setFromObject(mesh));
+
+                if (glowColor) {
+                    const glowMat = glowColor === 'cyan' ? cyanGlow : magentaGlow;
+                    const strip = new THREE.Mesh(boxGeo, glowMat);
+                    strip.scale.set(sx * 1.02, 0.2, sz * 1.02);
+                    strip.position.set(x, y + sy - 0.1, z);
+                    addMapMesh(strip);
+                }
+                return mesh;
+            }
+
+            // Floor Grid Texture
+            const gridCanvas = document.createElement('canvas');
+            gridCanvas.width = 512; gridCanvas.height = 512;
+            const gctx = gridCanvas.getContext('2d');
+            gctx.fillStyle = '#070a14'; gctx.fillRect(0, 0, 512, 512);
+            gctx.strokeStyle = '#00f0ff'; gctx.lineWidth = 4;
+            gctx.shadowColor = '#00f0ff'; gctx.shadowBlur = 8;
+            for (let i = 0; i <= 512; i += 64) {
+                gctx.beginPath();
+                gctx.moveTo(i, 0); gctx.lineTo(i, 512);
+                gctx.moveTo(0, i); gctx.lineTo(512, i);
+                gctx.stroke();
+            }
+            const floorTexture = new THREE.CanvasTexture(gridCanvas);
+            floorTexture.wrapS = THREE.RepeatWrapping;
+            floorTexture.wrapT = THREE.RepeatWrapping;
+            floorTexture.repeat.set(20, 20);
+
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_SIZE, ARENA_SIZE), new THREE.MeshStandardMaterial({
+                map: floorTexture, roughness: 0.2, metalness: 0.8
+            }));
+            floor.rotation.x = -Math.PI / 2;
+            addMapMesh(floor);
+
+            // Ceiling
+            const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_SIZE, ARENA_SIZE), new THREE.MeshBasicMaterial({ color: 0x03050c, side: THREE.BackSide }));
+            ceiling.position.y = WALL_HEIGHT;
+            ceiling.rotation.x = Math.PI / 2;
+            addMapMesh(ceiling);
+
+            // Outer Arena Walls
+            const wallGeos = [
+                { w: ARENA_SIZE, h: WALL_HEIGHT, d: 2, x: 0, z: -ARENA_SIZE/2 },
+                { w: ARENA_SIZE, h: WALL_HEIGHT, d: 2, x: 0, z: ARENA_SIZE/2 },
+                { w: 2, h: WALL_HEIGHT, d: ARENA_SIZE, x: -ARENA_SIZE/2, z: 0 },
+                { w: 2, h: WALL_HEIGHT, d: ARENA_SIZE, x: ARENA_SIZE/2, z: 0 }
+            ];
+            wallGeos.forEach(w => {
+                const wall = new THREE.Mesh(new THREE.BoxGeometry(w.w, w.h, w.d), wallMat);
+                wall.position.set(w.x, w.h / 2, w.z);
+                addMapMesh(wall);
+                obstacles.push(new THREE.Box3().setFromObject(wall));
+
+                const trim = new THREE.Mesh(new THREE.BoxGeometry(w.w, 0.3, w.d), borderGlowMat);
+                trim.position.set(w.x, w.h, w.z);
+                addMapMesh(trim);
+            });
+
+            // Map Layout Differentiation
+            if (mapType === 'fortress') {
+                // MAP 2: TACTICAL FORTRESS (Multi-level platforms, sniper towers, step ramps, stealth L-bunkers)
+                
+                // 1. Four Corner High Sniper Platforms (Height 4.5)
+                const cornerTowers = [
+                    [-36, -36], [36, -36], [-36, 36], [36, 36]
+                ];
+                cornerTowers.forEach(([tx, tz], i) => {
+                    const color = i % 2 === 0 ? 'cyan' : 'magenta';
+                    addObstacleBox(tx, 0, tz, 14, 4.5, 14, color, platformMat);
+                    coverPoints.push({ x: tx, z: tz });
+
+                    // Step Platforms leading up onto tower (Heights 2.0m & 3.4m)
+                    const dirX = tx < 0 ? 1 : -1;
+                    const dirZ = tz < 0 ? 1 : -1;
+                    addObstacleBox(tx + dirX * 10, 0, tz, 6, 2.0, 6, 'cyan', platformMat);
+                    addObstacleBox(tx + dirX * 10, 0, tz + dirZ * 6, 6, 3.4, 6, 'magenta', platformMat);
+                });
+
+                // 2. Central High Overpass & Sky Bridge (Height 4.0)
+                addObstacleBox(0, 0, 0, 28, 4.0, 16, 'cyan', platformMat); // Central Deck
+                addObstacleBox(-22, 0, 0, 16, 4.0, 8, 'magenta', platformMat); // West Skybridge
+                addObstacleBox(22, 0, 0, 16, 4.0, 8, 'magenta', platformMat); // East Skybridge
+
+                // Approach Steps leading to Central Deck
+                addObstacleBox(0, 0, -14, 10, 2.2, 6, 'cyan', platformMat);
+                addObstacleBox(0, 0, 14, 10, 2.2, 6, 'cyan', platformMat);
+
+                coverPoints.push({ x: 0, z: 0 }, { x: -20, z: 0 }, { x: 20, z: 0 });
+
+                // 3. Stealth Bunker Walls (L-Shaped Hiding Rooms)
+                const bunkers = [
+                    { x: -18, z: -18, w: 10, h: 4.5, d: 2, glow: 'magenta' },
+                    { x: -18, z: -23, w: 2, h: 4.5, d: 10, glow: 'cyan' },
+                    { x: 18, z: -18, w: 10, h: 4.5, d: 2, glow: 'cyan' },
+                    { x: 18, z: -23, w: 2, h: 4.5, d: 10, glow: 'magenta' },
+                    { x: -18, z: 18, w: 10, h: 4.5, d: 2, glow: 'cyan' },
+                    { x: -18, z: 23, w: 2, h: 4.5, d: 10, glow: 'magenta' },
+                    { x: 18, z: 18, w: 10, h: 4.5, d: 2, glow: 'magenta' },
+                    { x: 18, z: 23, w: 2, h: 4.5, d: 10, glow: 'cyan' }
+                ];
+                bunkers.forEach(b => {
+                    addObstacleBox(b.x, 0, b.z, b.w, b.h, b.d, b.glow);
+                    coverPoints.push({ x: b.x, z: b.z });
+                });
+
+                // 4. Low & Medium Cover Barricades
+                const barricades = [
+                    [0, -32, 14, 3.2, 3], [0, 32, 14, 3.2, 3],
+                    [-45, 0, 4, 3.5, 12], [45, 0, 4, 3.5, 12],
+                    [-25, -42, 6, 2.8, 6], [25, -42, 6, 2.8, 6],
+                    [-25, 42, 6, 2.8, 6], [25, 42, 6, 2.8, 6]
+                ];
+                barricades.forEach(([bx, bz, bw, bh, bd], idx) => {
+                    addObstacleBox(bx, 0, bz, bw, bh, bd, idx % 2 === 0 ? 'cyan' : 'magenta');
+                    coverPoints.push({ x: bx, z: bz });
+                });
+
+            } else if (mapType === 'labyrinth') {
+                // MAP 3: CYBER LABYRINTH (High Skywalk Bridges & Dense Hiding Maze)
+                
+                // 1. Central High Sky Tower (Height 6.0)
+                addObstacleBox(0, 0, 0, 10, 6.0, 10, 'cyan', platformMat);
+                coverPoints.push({ x: 0, z: 0 });
+
+                // 2. Four Overhead Skywalk Bridges (Height 5.0)
+                addObstacleBox(0, 0, -26, 32, 5.0, 6, 'magenta', platformMat); // North Skywalk
+                addObstacleBox(0, 0, 26, 32, 5.0, 6, 'magenta', platformMat); // South Skywalk
+                addObstacleBox(-26, 0, 0, 6, 5.0, 32, 'cyan', platformMat); // West Skywalk
+                addObstacleBox(26, 0, 0, 6, 5.0, 32, 'cyan', platformMat); // East Skywalk
+
+                coverPoints.push({ x: 0, z: -26 }, { x: 0, z: 26 }, { x: -26, z: 0 }, { x: 26, z: 0 });
+
+                // Multi-tier Step Platforms to climb onto Skywalks
+                const climbRamps = [
+                    [-20, -26, 2.2], [-20, -20, 3.8], [20, -26, 2.2], [20, -20, 3.8],
+                    [-20, 26, 2.2], [-20, 20, 3.8], [20, 26, 2.2], [20, 20, 3.8],
+                    [-26, -20, 2.2], [-20, -20, 3.8], [-26, 20, 2.2], [-20, 20, 3.8],
+                    [26, -20, 2.2], [20, -20, 3.8], [26, 20, 2.2], [20, 20, 3.8]
+                ];
+                climbRamps.forEach(([cx, cz, ch], idx) => {
+                    addObstacleBox(cx, 0, cz, 6, ch, 6, idx % 2 === 0 ? 'cyan' : 'magenta', platformMat);
+                });
+
+                // 3. Dense Maze Hiding Walls (Height 6.5)
+                const mazeWalls = [
+                    [-14, -14, 18, 6.5, 2, 'cyan'], [14, -14, 18, 6.5, 2, 'magenta'],
+                    [-14, 14, 18, 6.5, 2, 'magenta'], [14, 14, 18, 6.5, 2, 'cyan'],
+                    [-14, 0, 2, 6.5, 14, 'cyan'], [14, 0, 2, 6.5, 14, 'magenta'],
+                    
+                    [-36, -15, 2, 6.5, 20, 'magenta'], [36, -15, 2, 6.5, 20, 'cyan'],
+                    [-36, 15, 2, 6.5, 20, 'cyan'], [36, 15, 2, 6.5, 20, 'magenta'],
+
+                    [-15, -38, 20, 6.5, 2, 'cyan'], [15, -38, 20, 6.5, 2, 'magenta'],
+                    [-15, 38, 20, 6.5, 2, 'magenta'], [15, 38, 20, 6.5, 2, 'cyan'],
+
+                    [-42, -42, 8, 5.0, 8, 'cyan'], [42, -42, 8, 5.0, 8, 'magenta'],
+                    [-42, 42, 8, 5.0, 8, 'magenta'], [42, 42, 8, 5.0, 8, 'cyan']
+                ];
+                mazeWalls.forEach(([mwX, mwZ, mwW, mwH, mwD, mwGlow]) => {
+                    addObstacleBox(mwX, 0, mwZ, mwW, mwH, mwD, mwGlow);
+                    coverPoints.push({ x: mwX, z: mwZ });
+                });
+
+            } else {
+                // MAP 1: NEON ARENA (Classic Open Grid)
+                addObstacleBox(-15, 0, -15, 6, 8, 6, 'cyan');
+                addObstacleBox(15, 0, -15, 6, 8, 6, 'magenta');
+                addObstacleBox(-15, 0, 15, 6, 8, 6, 'magenta');
+                addObstacleBox(15, 0, 15, 6, 8, 6, 'cyan');
+
+                coverPoints.push(
+                    { x: -15, z: -15 }, { x: 15, z: -15 }, { x: -15, z: 15 }, { x: 15, z: 15 },
+                    { x: -30, z: -30 }, { x: 30, z: 30 }, { x: -30, z: 30 }, { x: 30, z: -30 },
+                    { x: 0, z: -25 }, { x: 0, z: 25 }, { x: -25, z: 0 }, { x: 25, z: 0 },
+                    { x: -45, z: 0 }, { x: 45, z: 0 }, { x: 0, z: -45 }, { x: 0, z: 45 }
+                );
+
+                const placements = [
+                    [-30, -30, 8, 3, 4], [30, 30, 8, 3, 4], [-30, 30, 4, 3, 8], [30, -30, 4, 3, 8],
+                    [0, -25, 12, 4, 3], [0, 25, 12, 4, 3], [-25, 0, 3, 4, 12], [25, 0, 3, 4, 12],
+                    [-45, 0, 6, 6, 6], [45, 0, 6, 6, 6], [0, -45, 6, 6, 6], [0, 45, 6, 6, 6]
+                ];
+                placements.forEach((p, idx) => {
+                    addObstacleBox(p[0], 0, p[1], p[2], p[3], p[4], idx % 2 === 0 ? 'cyan' : 'magenta');
+                });
+            }
+        }
+
+        buildArena('fortress');
+
+        /* -------------------------------------------------------------
+         * PLAYER WEAPON MODEL IN 3D CAMERA VIEW
+         * ------------------------------------------------------------- */
+        const gunGroup = new THREE.Group();
+
+        // Gun Body
+        const gunBodyMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.2 });
+        const gunGlowMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+
+        const mainBody = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.16, 0.6), gunBodyMat);
+        mainBody.position.set(0, 0, 0);
+        gunGroup.add(mainBody);
+
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 16), gunBodyMat);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.set(0, 0.03, -0.4);
+        gunGroup.add(barrel);
+
+        const energyCore = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.08, 0.2), gunGlowMat);
+        energyCore.position.set(0, 0.02, -0.05);
+        gunGroup.add(energyCore);
+
+        // Muzzle Flash Light
+        const muzzleLight = new THREE.PointLight(0x00f0ff, 0, 8);
+        muzzleLight.position.set(0, 0.03, -0.7);
+        gunGroup.add(muzzleLight);
+
+        gunGroup.position.set(0.25, -0.22, -0.45);
+        camera.add(gunGroup);
+        scene.add(camera);
+
+        /* -------------------------------------------------------------
+         * AI BOT SYSTEM - TACTICAL COVER & NEON PINK PERSON MODELS
+         * ------------------------------------------------------------- */
+        const bots = [];
+
+        // Neon Pink Person Materials
+        const neonPinkPersonMat = new THREE.MeshStandardMaterial({
+            color: 0xff00aa,
+            emissive: 0xff00aa,
+            emissiveIntensity: 1.8,
+            roughness: 0.15,
+            metalness: 0.2
+        });
+        const neonPinkJointMat = new THREE.MeshBasicMaterial({ color: 0xff66cc });
+        const cyanEyeMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+
+        class EnemyBot {
+            constructor(x, z) {
+                this.mesh = new THREE.Group();
+
+                // Build 3D Person Model (Head, Torso, Arms, Legs)
+                // Head
+                const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 16), neonPinkPersonMat);
+                head.position.y = 1.7;
+                this.mesh.add(head);
+
+                // Cyan Eye Visor
+                const eye = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.1, 0.22), cyanEyeMat);
+                eye.position.set(0, 1.72, -0.2);
+                this.mesh.add(eye);
+
+                // Torso / Body
+                const torso = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.85, 0.38), neonPinkPersonMat);
+                torso.position.y = 1.1;
+                this.mesh.add(torso);
+
+                // Left Arm Group
+                this.leftArm = new THREE.Group();
+                const lArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.75, 12), neonPinkPersonMat);
+                lArmMesh.position.y = -0.35;
+                this.leftArm.add(lArmMesh);
+                this.leftArm.position.set(-0.42, 1.45, 0);
+                this.mesh.add(this.leftArm);
+
+                // Right Arm Group
+                this.rightArm = new THREE.Group();
+                const rArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.75, 12), neonPinkPersonMat);
+                rArmMesh.position.y = -0.35;
+                this.rightArm.add(rArmMesh);
+                this.rightArm.position.set(0.42, 1.45, 0);
+                this.mesh.add(this.rightArm);
+
+                // Left Leg Group
+                this.leftLeg = new THREE.Group();
+                const lLegMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.8, 12), neonPinkPersonMat);
+                lLegMesh.position.y = -0.4;
+                this.leftLeg.add(lLegMesh);
+                this.leftLeg.position.set(-0.2, 0.65, 0);
+                this.mesh.add(this.leftLeg);
+
+                // Right Leg Group
+                this.rightLeg = new THREE.Group();
+                const rLegMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.8, 12), neonPinkPersonMat);
+                rLegMesh.position.y = -0.4;
+                this.rightLeg.add(rLegMesh);
+                this.rightLeg.position.set(0.2, 0.65, 0);
+                this.mesh.add(this.rightLeg);
+
+                // Joint Highlights
+                const shoulderL = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), neonPinkJointMat);
+                shoulderL.position.set(-0.42, 1.45, 0);
+                this.mesh.add(shoulderL);
+
+                const shoulderR = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), neonPinkJointMat);
+                shoulderR.position.set(0.42, 1.45, 0);
+                this.mesh.add(shoulderR);
+
+                // Radiant Pink Light source on person
+                this.pinkLight = new THREE.PointLight(0xff00aa, 2.5, 15);
+                this.pinkLight.position.set(0, 1.4, 0);
+                this.mesh.add(this.pinkLight);
+
+                this.mesh.position.set(x, 0, z);
+                scene.add(this.mesh);
+
+                this.health = 100;
+                this.maxHealth = 100;
+                this.speed = 7.0 + Math.random() * 2.5;
+                this.lastShot = 0;
+                // Humanlike fast reaction shooting (1.2s to 2.2s between shots)
+                this.shootInterval = 1200 + Math.random() * 1000;
+
+                // Personality Roles: 'RUSHER' (40%), 'FLANKER' (40%), 'COVER_TACTICIAN' (20%)
+                const randRole = Math.random();
+                if (randRole < 0.4) this.role = 'RUSHER';
+                else if (randRole < 0.8) this.role = 'FLANKER';
+                else this.role = 'COVER_TACTICIAN';
+
+                // Combat State: 'PUSH_ATTACK', 'STRAFE_COMBAT', 'FLANK_MOVE', 'IN_COVER'
+                this.state = 'PUSH_ATTACK';
+                this.targetPos = new THREE.Vector3();
+                this.strafeDir = Math.random() < 0.5 ? 1 : -1;
+                this.stateTimer = 0;
+                this.animTime = Math.random() * 10;
+
+                // Hitbox
+                this.box = new THREE.Box3();
+                this.chooseTacticalObjective();
+            }
+
+            chooseTacticalObjective() {
+                const playerPos = camera.position;
+                const shuffled = [...coverPoints].sort(() => Math.random() - 0.5);
+
+                if (this.role === 'RUSHER') {
+                    // Aggressive Push: Find cover/position CLOSE to player (8 - 20 units distance)
+                    let found = false;
+                    for (let cp of shuffled) {
+                        const d = Math.hypot(cp.x - playerPos.x, cp.z - playerPos.z);
+                        if (d >= 8 && d <= 22) {
+                            this.targetPos.set(cp.x + (Math.random() - 0.5) * 4, 0, cp.z + (Math.random() - 0.5) * 4);
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        // Push straight toward player position offset
+                        const dirToPlayer = new THREE.Vector3(playerPos.x - this.mesh.position.x, 0, playerPos.z - this.mesh.position.z).normalize();
+                        this.targetPos.set(playerPos.x - dirToPlayer.x * 12, 0, playerPos.z - dirToPlayer.z * 12);
+                    }
+                    this.state = 'PUSH_ATTACK';
+
+                } else if (this.role === 'FLANKER') {
+                    // Flank around the side of the player
+                    const dirToPlayer = new THREE.Vector3(playerPos.x - this.mesh.position.x, 0, playerPos.z - this.mesh.position.z).normalize();
+                    // 90 degree perpendicular vector for side flanking
+                    const perp = new THREE.Vector3(-dirToPlayer.z, 0, dirToPlayer.x).multiplyScalar(this.strafeDir * 18);
+                    this.targetPos.set(playerPos.x + perp.x, 0, playerPos.z + perp.z);
+                    this.state = 'FLANK_MOVE';
+
+                } else {
+                    // Cover Tactician: Find obstacle cover point relative to player
+                    for (let cp of shuffled) {
+                        const d = Math.hypot(cp.x - playerPos.x, cp.z - playerPos.z);
+                        if (d >= 15 && d <= 35) {
+                            const dirFromPlayer = new THREE.Vector3(cp.x - playerPos.x, 0, cp.z - playerPos.z).normalize();
+                            this.targetPos.set(cp.x + dirFromPlayer.x * 3.5, 0, cp.z + dirFromPlayer.z * 3.5);
+                            break;
+                        }
+                    }
+                    this.state = 'IN_COVER';
+                    this.stateTimer = performance.now() + 1200 + Math.random() * 1200;
+                }
+
+                // Bounds check targetPos
+                this.targetPos.x = Math.max(-ARENA_SIZE/2 + 4, Math.min(ARENA_SIZE/2 - 4, this.targetPos.x));
+                this.targetPos.z = Math.max(-ARENA_SIZE/2 + 4, Math.min(ARENA_SIZE/2 - 4, this.targetPos.z));
+            }
+
+            update(delta, now) {
+                if (this.health <= 0) return;
+
+                const playerPos = camera.position;
+                const distToPlayer = this.mesh.position.distanceTo(playerPos);
+
+                // Anti-clustering scatter: Keep distance from other bots
+                bots.forEach(other => {
+                    if (other !== this && other.health > 0) {
+                        const distToBot = this.mesh.position.distanceTo(other.mesh.position);
+                        if (distToBot < 4.5) {
+                            const push = new THREE.Vector3().subVectors(this.mesh.position, other.mesh.position).setY(0).normalize();
+                            this.mesh.position.addScaledVector(push, 3.0 * delta);
+                        }
+                    }
+                });
+
+                let moveStepVec = new THREE.Vector3();
+                let faceTarget = playerPos; // Face player by default during combat!
+
+                // Tactical Behavior Decision Loop
+                if (this.state === 'PUSH_ATTACK') {
+                    // Running aggressively toward tactical target near player
+                    const dir = new THREE.Vector3().subVectors(this.targetPos, this.mesh.position).setY(0).normalize();
+                    moveStepVec.copy(dir).multiplyScalar(this.speed * delta);
+
+                    // Face direction of movement while pushing forward
+                    faceTarget = this.targetPos;
+
+                    if (this.mesh.position.distanceTo(this.targetPos) < 2.5 || distToPlayer < 14) {
+                        // Switch to active combat strafing once close!
+                        this.state = 'STRAFE_COMBAT';
+                        this.stateTimer = now + 2500 + Math.random() * 2000;
+                    }
+
+                } else if (this.state === 'STRAFE_COMBAT') {
+                    // Active Humanlike Combat Strafing (Moving side-to-side while shooting)
+                    const dirToPlayer = new THREE.Vector3(playerPos.x - this.mesh.position.x, 0, playerPos.z - this.mesh.position.z).normalize();
+                    // Side vector
+                    const sideVec = new THREE.Vector3(-dirToPlayer.z, 0, dirToPlayer.x).multiplyScalar(this.strafeDir);
+                    
+                    // Slightly close in or back up depending on distance
+                    const distFactor = distToPlayer > 18 ? 0.4 : (distToPlayer < 8 ? -0.3 : 0.0);
+                    const combinedDir = sideVec.addScaledVector(dirToPlayer, distFactor).normalize();
+
+                    moveStepVec.copy(combinedDir).multiplyScalar((this.speed * 0.85) * delta);
+                    faceTarget = playerPos; // Always look at player while strafing & firing!
+
+                    // Periodically reverse strafe direction or push forward
+                    if (now > this.stateTimer) {
+                        if (Math.random() < 0.5) {
+                            this.strafeDir *= -1; // Reverse strafe direction
+                            this.stateTimer = now + 2000 + Math.random() * 1500;
+                        } else {
+                            this.chooseTacticalObjective(); // Pick new push/flank objective
+                        }
+                    }
+
+                } else if (this.state === 'FLANK_MOVE') {
+                    // Flanking around obstacles to attack from side/rear
+                    const dir = new THREE.Vector3().subVectors(this.targetPos, this.mesh.position).setY(0).normalize();
+                    moveStepVec.copy(dir).multiplyScalar(this.speed * delta);
+                    faceTarget = this.targetPos;
+
+                    if (this.mesh.position.distanceTo(this.targetPos) < 3.0 || distToPlayer < 16) {
+                        this.state = 'STRAFE_COMBAT';
+                        this.stateTimer = now + 3000;
+                    }
+
+                } else if (this.state === 'IN_COVER') {
+                    // Brief cover pause, then step out and attack!
+                    faceTarget = playerPos;
+                    if (now > this.stateTimer) {
+                        this.state = 'STRAFE_COMBAT';
+                        this.stateTimer = now + 2500;
+                    }
+                }
+
+                // Execute Position Update & Bounds Check
+                if (moveStepVec.lengthSq() > 0) {
+                    const newPos = this.mesh.position.clone().add(moveStepVec);
+
+                    // Bot obstacle collision check
+                    const botRadius = 0.6;
+                    for (let obs of obstacles) {
+                        const minX = obs.min.x - botRadius;
+                        const maxX = obs.max.x + botRadius;
+                        const minZ = obs.min.z - botRadius;
+                        const maxZ = obs.max.z + botRadius;
+
+                        if (newPos.x > minX && newPos.x < maxX && newPos.z > minZ && newPos.z < maxZ) {
+                            const penLeft = newPos.x - minX;
+                            const penRight = maxX - newPos.x;
+                            const penBack = newPos.z - minZ;
+                            const penFront = maxZ - newPos.z;
+
+                            const minPen = Math.min(penLeft, penRight, penBack, penFront);
+
+                            if (minPen === penLeft) newPos.x = minX;
+                            else if (minPen === penRight) newPos.x = maxX;
+                            else if (minPen === penBack) newPos.z = minZ;
+                            else if (minPen === penFront) newPos.z = maxZ;
+                        }
+                    }
+
+                    if (Math.abs(newPos.x) < ARENA_SIZE/2 - 3 && Math.abs(newPos.z) < ARENA_SIZE/2 - 3) {
+                        this.mesh.position.copy(newPos);
+                    }
+
+                    // Animate leg & arm walking motion
+                    this.animTime += delta * 12;
+                    const swing = Math.sin(this.animTime) * 0.55;
+                    this.leftArm.rotation.x = swing;
+                    this.rightArm.rotation.x = -swing;
+                    this.leftLeg.rotation.x = -swing;
+                    this.rightLeg.rotation.x = swing;
+                }
+
+                // Look at facing target (Player or Movement direction)
+                this.mesh.lookAt(faceTarget.x, 0, faceTarget.z);
+
+                // Update Bounding Box
+                this.box.setFromObject(this.mesh);
+
+                // Shoot at Player actively (Active humanlike engagement)
+                if (distToPlayer < 40 && now - this.lastShot > this.shootInterval && STATE.isPlaying) {
+                    this.shootAtPlayer();
+                    this.lastShot = now;
+                }
+            }
+
+            shootAtPlayer() {
+                const origin = this.mesh.position.clone().setY(1.45);
+                const target = camera.position.clone();
+
+                // Accurate player tracking aim
+                target.x += (Math.random() - 0.5) * 1.4;
+                target.y += (Math.random() - 0.5) * 0.8;
+                target.z += (Math.random() - 0.5) * 1.4;
+
+                const dir = new THREE.Vector3().subVectors(target, origin).normalize();
+                createLaser(origin, dir, 0xff00aa, 38, false, 14);
+            }
+
+            takeDamage(dmg) {
+                this.health -= dmg;
+                // Neon Pink hit flash effect
+                neonPinkPersonMat.emissive.setHex(0x00ffff);
+                setTimeout(() => neonPinkPersonMat.emissive.setHex(0xff00aa), 120);
+
+                // Dynamic reaction to damage: Aggressive rusher counter-attacks or flankers strafe!
+                if (this.role === 'RUSHER') {
+                    this.state = 'STRAFE_COMBAT'; // Aggressive counter-attack strafe
+                    this.strafeDir *= -1;
+                } else {
+                    this.chooseTacticalObjective(); // Re-evaluate cover/flank
+                }
+
+                if (this.health <= 0) {
+                    this.die();
+                }
+            }
+
+            die() {
+                scene.remove(this.mesh);
+                audio.playExplosion();
+                createExplosionParticles(this.mesh.position);
+                STATE.score += 150;
+                STATE.tags += 1;
+                updateHUD();
+                addKillFeed('YOU tagged CyberBot!');
+
+                // Respawn next wave check
+                const idx = bots.indexOf(this);
+                if (idx > -1) bots.splice(idx, 1);
+
+                if (bots.length === 0) {
+                    STATE.wave += 1;
+                    spawnWave(STATE.wave + 2);
+                }
+            }
+        }
+
+        function spawnWave(count) {
+            updateHUD();
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 25 + Math.random() * 25;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+                bots.push(new EnemyBot(x, z));
+            }
+        }
+
+        /* -------------------------------------------------------------
+         * LASERS & PARTICLES SYSTEM
+         * ------------------------------------------------------------- */
+        const lasers = [];
+        const particles = [];
+
+        const laserGeo = new THREE.CylinderGeometry(0.06, 0.06, 1.5, 8);
+        laserGeo.rotateX(Math.PI / 2);
+
+        function createLaser(origin, dir, colorHex, speed, isPlayer = true, damage = 25) {
+            const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+            const mesh = new THREE.Mesh(laserGeo, mat);
+            mesh.position.copy(origin);
+            mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), dir);
+            scene.add(mesh);
+
+            lasers.push({
+                mesh,
+                dir,
+                speed,
+                isPlayer,
+                damage,
+                life: 2.5
+            });
+        }
+
+        function createExplosionParticles(pos, colorHex = 0xff0055) {
+            const pGeo = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+            const pMat = new THREE.MeshBasicMaterial({ color: colorHex });
+
+            for (let i = 0; i < 15; i++) {
+                const p = new THREE.Mesh(pGeo, pMat);
+                p.position.copy(pos);
+                scene.add(p);
+
+                const vel = new THREE.Vector3(
+                    (Math.random() - 0.5) * 12,
+                    Math.random() * 8,
+                    (Math.random() - 0.5) * 12
+                );
+
+                particles.push({ mesh: p, vel, life: 0.6 });
+            }
+        }
+
+        /* -------------------------------------------------------------
+         * PLAYER INPUT & POINTER LOCK CONTROLS
+         * ------------------------------------------------------------- */
+        const keys = {};
+        let pitch = 0;
+        let yaw = 0;
+        let mouseSensitivity = 0.0022; // Restored original fast mouse sensitivity
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') e.preventDefault();
+            keys[e.code] = true;
+
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyShift') {
+                STATE.player.isCrouching = true;
+                STATE.player.targetHeight = 0.9;
+                document.getElementById('stance-indicator').classList.add('visible');
+            }
+
+            if (e.code === 'Digit1') switchWeapon(1);
+            if (e.code === 'Digit2') switchWeapon(2);
+            if (e.code === 'Digit3') switchWeapon(3);
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyShift') {
+                STATE.player.isCrouching = false;
+                STATE.player.targetHeight = 1.6;
+                document.getElementById('stance-indicator').classList.remove('visible');
+            }
+        });
+
+        window.addEventListener('wheel', (e) => {
+            if (!STATE.isPlaying) return;
+            let nextWpn = STATE.currentWeapon + (e.deltaY > 0 ? 1 : -1);
+            if (nextWpn > 3) nextWpn = 1;
+            if (nextWpn < 1) nextWpn = 3;
+            switchWeapon(nextWpn);
+        });
+
+        function switchWeapon(id) {
+            STATE.currentWeapon = id;
+            const wpn = STATE.weapons[id];
+            document.getElementById('weapon-name').innerText = wpn.name;
+            document.getElementById('ammo-current').innerText = wpn.ammo;
+            energyCore.material.color.setHex(wpn.color);
+
+            document.querySelectorAll('.wpn-slot').forEach(s => s.classList.remove('active'));
+            document.getElementById(`slot-${id}`).classList.add('active');
+        }
+
+        document.body.addEventListener('click', (e) => {
+            if (!STATE.isPlaying && document.getElementById('start-screen').classList.contains('hidden') === false) return;
+
+            if (document.pointerLockElement !== document.body && STATE.isPlaying) {
+                tryPointerLock();
+            } else if (STATE.isPlaying) {
+                playerShoot();
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement === document.body) {
+                yaw -= e.movementX * mouseSensitivity;
+                pitch -= e.movementY * mouseSensitivity;
+                // Clamp pitch to 1.48 rad (~85 deg) to avoid camera flips
+                pitch = Math.max(-1.48, Math.min(1.48, pitch));
+            }
+        });
+
+        function playerShoot() {
+            const wpn = STATE.weapons[STATE.currentWeapon];
+            const now = performance.now();
+            if (now - wpn.lastFired < wpn.cd) return;
+
+            wpn.lastFired = now;
+            STATE.shotsFired++;
+
+            // Sound
+            audio.playShoot(wpn.type);
+
+            // Muzzle Flash
+            muzzleLight.color.setHex(wpn.color);
+            muzzleLight.intensity = 3.0;
+            setTimeout(() => muzzleLight.intensity = 0, 60);
+
+            // Recoil
+            gunGroup.position.z = -0.32;
+            setTimeout(() => gunGroup.position.z = -0.45, 100);
+
+            // Laser Beam spawn position
+            const dir = new THREE.Vector3();
+            camera.getWorldDirection(dir);
+            const origin = camera.position.clone().add(dir.clone().multiplyScalar(0.6));
+
+            createLaser(origin, dir, wpn.color, wpn.speed, true, wpn.damage);
+
+            // Broadcast shooting event over WebSockets
+            if (roomSocket && roomSocket.readyState === WebSocket.OPEN) {
+                roomSocket.send(JSON.stringify({
+                    type: "shoot",
+                    origin: { x: origin.x, y: origin.y, z: origin.z },
+                    dir: { x: dir.x, y: dir.y, z: dir.z },
+                    color: wpn.color,
+                    speed: wpn.speed,
+                    damage: wpn.damage
+                }));
+            }
+        }
+
+        /* -------------------------------------------------------------
+         * GAME LOOP & PHYSICS UPDATE
+         * ------------------------------------------------------------- */
+        let lastTime = performance.now();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const now = performance.now();
+            const delta = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+
+            if (STATE.isPlaying) {
+                updatePlayer(delta);
+                updateBots(delta, now);
+                updateLasers(delta);
+                updateParticles(delta);
+                renderMinimap();
+
+                // Smoothly interpolate remote players 3D position & yaw
+                if (typeof remotePlayers === 'object') {
+                    Object.values(remotePlayers).forEach(rp => {
+                        rp.mesh.position.lerp(rp.targetPos, delta * 15);
+                        rp.mesh.rotation.y += (rp.targetYaw - rp.mesh.rotation.y) * delta * 15;
+                    });
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function updatePlayer(delta) {
+            // Smooth crouch height transition
+            STATE.player.height += (STATE.player.targetHeight - STATE.player.height) * 12 * delta;
+
+            // Direct 1-to-1 FPS camera rotation with YXZ order (prevents sideways tilt)
+            camera.rotation.y = yaw;
+            camera.rotation.x = pitch;
+
+            // Movement vectors
+            const moveSpeed = STATE.player.isCrouching ? 5.0 : 10.0;
+            const moveDir = new THREE.Vector3();
+
+            if (keys['KeyW']) moveDir.z -= 1;
+            if (keys['KeyS']) moveDir.z += 1;
+            if (keys['KeyA']) moveDir.x -= 1;
+            if (keys['KeyD']) moveDir.x += 1;
+
+            moveDir.normalize();
+            moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+
+            // Apply Velocity & Collision
+            const nextPos = camera.position.clone().addScaledVector(moveDir, moveSpeed * delta);
+
+            // Jump Logic
+            if (keys['Space'] && STATE.player.isGrounded) {
+                STATE.player.vel.y = 8.0;
+                STATE.player.isGrounded = false;
+            }
+
+            // Solid Hitbox Collision with Arena Pillars & Cover Crates
+            let groundHeight = 0;
+            const playerRadius = 0.65;
+            const playerFeetY = nextPos.y - STATE.player.height;
+
+            for (let obs of obstacles) {
+                const minX = obs.min.x - playerRadius;
+                const maxX = obs.max.x + playerRadius;
+                const minZ = obs.min.z - playerRadius;
+                const maxZ = obs.max.z + playerRadius;
+
+                // Check horizontal overlap
+                if (nextPos.x > minX && nextPos.x < maxX && nextPos.z > minZ && nextPos.z < maxZ) {
+                    // Check if landing on top of obstacle
+                    if (playerFeetY >= obs.max.y - 0.4 && STATE.player.vel.y <= 0) {
+                        groundHeight = Math.max(groundHeight, obs.max.y);
+                    } else if (nextPos.y > obs.min.y && playerFeetY < obs.max.y - 0.1) {
+                        // Side collision: resolve along shortest penetration vector
+                        const penLeft = nextPos.x - minX;
+                        const penRight = maxX - nextPos.x;
+                        const penBack = nextPos.z - minZ;
+                        const penFront = maxZ - nextPos.z;
+
+                        const minPen = Math.min(penLeft, penRight, penBack, penFront);
+
+                        if (minPen === penLeft) nextPos.x = minX;
+                        else if (minPen === penRight) nextPos.x = maxX;
+                        else if (minPen === penBack) nextPos.z = minZ;
+                        else if (minPen === penFront) nextPos.z = maxZ;
+                    }
+                }
+            }
+
+            const currentBaseHeight = groundHeight + STATE.player.height;
+
+            // Gravity & Airborne Vertical Integration
+            if (!STATE.player.isGrounded) {
+                STATE.player.vel.y -= 20.0 * delta;
+                nextPos.y += STATE.player.vel.y * delta;
+
+                if (nextPos.y <= currentBaseHeight) {
+                    nextPos.y = currentBaseHeight;
+                    STATE.player.vel.y = 0;
+                    STATE.player.isGrounded = true;
+                }
+            } else {
+                if (nextPos.y > currentBaseHeight + 0.1) {
+                    STATE.player.isGrounded = false;
+                } else {
+                    nextPos.y = currentBaseHeight;
+                }
+            }
+
+            // Arena Outer Wall Collision
+            const halfSize = ARENA_SIZE / 2 - 1.5;
+            nextPos.x = Math.max(-halfSize, Math.min(halfSize, nextPos.x));
+            nextPos.z = Math.max(-halfSize, Math.min(halfSize, nextPos.z));
+
+            camera.position.copy(nextPos);
+
+            // Broadcast local position over WebSockets (~30Hz)
+            if (typeof roomSocket !== 'undefined' && roomSocket && roomSocket.readyState === WebSocket.OPEN) {
+                const now = performance.now();
+                if (!STATE.lastNetworkSync || now - STATE.lastNetworkSync > 33) {
+                    STATE.lastNetworkSync = now;
+                    roomSocket.send(JSON.stringify({
+                        type: "pos",
+                        x: camera.position.x,
+                        y: camera.position.y,
+                        z: camera.position.z,
+                        yaw: yaw,
+                        pitch: pitch
+                    }));
+                }
+            }
+
+            // Natural Shield Regeneration
+            if (STATE.player.shield < 100) {
+                STATE.player.shield = Math.min(100, STATE.player.shield + 4 * delta);
+                updateHUD();
+            }
+        }
+
+        function updateBots(delta, now) {
+            bots.forEach(bot => bot.update(delta, now));
+        }
+
+        function updateLasers(delta) {
+            for (let i = lasers.length - 1; i >= 0; i--) {
+                const l = lasers[i];
+                l.mesh.position.addScaledVector(l.dir, l.speed * delta);
+                l.life -= delta;
+
+                let hit = false;
+
+                if (l.isPlayer) {
+                    // Check hit against bots
+                    for (let b of bots) {
+                        if (b.box.containsPoint(l.mesh.position)) {
+                            b.takeDamage(l.damage);
+                            showHitMarker();
+                            audio.playHitMarker();
+                            STATE.shotsHit++;
+                            hit = true;
+                            break;
+                        }
+                    }
+                } else {
+                    // Check hit against player
+                    if (l.mesh.position.distanceTo(camera.position) < 1.2) {
+                        damagePlayer(l.damage);
+                        hit = true;
+                    }
+                }
+
+                // Check hit against obstacles
+                if (!hit) {
+                    for (let obs of obstacles) {
+                        if (obs.containsPoint(l.mesh.position)) {
+                            hit = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (hit || l.life <= 0) {
+                    createExplosionParticles(l.mesh.position, l.mesh.material.color.getHex());
+                    scene.remove(l.mesh);
+                    lasers.splice(i, 1);
+                }
+            }
+        }
+
+        function updateParticles(delta) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.mesh.position.addScaledVector(p.vel, delta);
+                p.life -= delta;
+
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        function damagePlayer(amount) {
+            audio.playHurt();
+
+            if (STATE.player.shield > 0) {
+                STATE.player.shield -= amount;
+                if (STATE.player.shield < 0) {
+                    STATE.player.health += STATE.player.shield;
+                    STATE.player.shield = 0;
+                }
+            } else {
+                STATE.player.health -= amount;
+            }
+
+            updateHUD();
+
+            if (STATE.player.health <= 0) {
+                gameOver();
+            }
+        }
+
+        function showHitMarker() {
+            const hm = document.getElementById('hit-marker');
+            hm.style.opacity = '1';
+            setTimeout(() => hm.style.opacity = '0', 120);
+        }
+
+        /* -------------------------------------------------------------
+         * HUD & MINIMAP RENDERER
+         * ------------------------------------------------------------- */
+        const minimapCanvas = document.getElementById('minimap');
+        const mctx = minimapCanvas.getContext('2d');
+
+        function renderMinimap() {
+            const w = 150, h = 150;
+            mctx.clearRect(0, 0, w, h);
+
+            // Center is player
+            const mapScale = w / ARENA_SIZE;
+
+            // Draw player
+            mctx.fillStyle = '#00f0ff';
+            mctx.beginPath();
+            mctx.arc(w/2, h/2, 4, 0, Math.PI * 2);
+            mctx.fill();
+
+            // Player Direction Arrow
+            mctx.strokeStyle = '#00f0ff';
+            mctx.lineWidth = 2;
+            mctx.beginPath();
+            mctx.moveTo(w/2, h/2);
+            mctx.lineTo(w/2 - Math.sin(yaw) * 12, h/2 - Math.cos(yaw) * 12);
+            mctx.stroke();
+
+            // Draw Bots
+            mctx.fillStyle = '#ff0055';
+            bots.forEach(b => {
+                const dx = (b.mesh.position.x - camera.position.x) * mapScale;
+                const dz = (b.mesh.position.z - camera.position.z) * mapScale;
+
+                const mx = w/2 + dx;
+                const my = h/2 + dz;
+
+                if (mx >= 0 && mx <= w && my >= 0 && my <= h) {
+                    mctx.beginPath();
+                    mctx.arc(mx, my, 3.5, 0, Math.PI * 2);
+                    mctx.fill();
+                }
+            });
+        }
+
+        function updateHUD() {
+            document.getElementById('hud-score').innerText = STATE.score;
+            document.getElementById('hud-wave').innerText = `WAVE ${STATE.wave}`;
+            document.getElementById('shield-text').innerText = Math.max(0, Math.round(STATE.player.shield));
+            document.getElementById('health-text').innerText = Math.max(0, Math.round(STATE.player.health));
+            document.getElementById('shield-fill').style.width = `${Math.max(0, STATE.player.shield)}%`;
+            document.getElementById('health-fill').style.width = `${Math.max(0, STATE.player.health)}%`;
+        }
+
+        function addKillFeed(msg) {
+            const feed = document.getElementById('kill-feed');
+            const entry = document.createElement('div');
+            entry.className = 'kill-entry player-kill';
+            entry.innerText = msg;
+            feed.prepend(entry);
+            setTimeout(() => entry.remove(), 4000);
+        }
+
+        /* -------------------------------------------------------------
+         * MULTIPLAYER BACKEND CLIENT (PostgreSQL, FastAPI, WebSockets)
+         * ------------------------------------------------------------- */
+        const API_BASE = "http://localhost:8000";
+        const WS_BASE = "ws://localhost:8000";
+
+        let localUser = {
+            id: null,
+            username: "Player_" + Math.floor(Math.random() * 8999 + 1000),
+            token: localStorage.getItem("cybertag_token") || null
+        };
+
+        let currentRoomId = null;
+        let globalSocket = null;
+        let roomSocket = null;
+        let isBackendOnline = false;
+        let activeChannel = "global";
+        
+        const remotePlayers = {};
+        const localPlayerId = "p_" + Math.random().toString(36).substr(2, 9);
+
+        async function checkBackendHealth() {
+            const badge = document.getElementById("server-status-badge");
+            try {
+                const res = await fetch(`${API_BASE}/`, { signal: AbortSignal.timeout(2000) });
+                if (res.ok) {
+                    isBackendOnline = true;
+                    if (badge) {
+                        badge.innerText = "● SERVER ONLINE (PostgreSQL)";
+                        badge.classList.add("online");
+                    }
+                    initGlobalSockets();
+                    if (localUser.token) fetchUserProfile();
+                    fetchRoomList();
+                    fetchFriendsList();
+                    return;
+                }
+            } catch (err) {}
+
+            isBackendOnline = false;
+            if (badge) {
+                badge.innerText = "● OFFLINE MODE (Solo vs AI)";
+                badge.classList.remove("online");
+            }
+        }
+
+        function initGlobalSockets() {
+            if (globalSocket || !isBackendOnline) return;
+            try {
+                globalSocket = new WebSocket(`${WS_BASE}/ws/global`);
+                globalSocket.onmessage = (event) => {
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === "chat" && msg.channel === "global") {
+                        appendChatMessage("GLOBAL", msg.username, msg.content);
+                    }
+                };
+                globalSocket.onclose = () => { globalSocket = null; };
+            } catch (e) {}
+        }
+
+        async function handleAuth(action) {
+            const uInput = document.getElementById("auth-username").value.trim();
+            const pInput = document.getElementById("auth-password").value.trim();
+            if (!uInput || !pInput) return alert("Please enter username and password.");
+
+            const endpoint = action === "login" ? "/api/auth/login" : "/api/auth/register";
+            try {
+                const res = await fetch(`${API_BASE}${endpoint}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username: uInput, password: pInput })
+                });
+                const data = await res.json();
+                if (!res.ok) return alert(data.detail || "Authentication failed.");
+
+                localStorage.setItem("cybertag_token", data.access_token);
+                localUser.token = data.access_token;
+                localUser.username = data.username;
+                
+                document.getElementById("auth-modal").classList.add("hidden");
+                updateAccountUI();
+                fetchFriendsList();
+                fetchRoomList();
+                alert(`Welcome, ${data.username}!`);
+            } catch (e) {
+                alert("Cannot connect to authentication server.");
+            }
+        }
+
+        async function fetchUserProfile() {
+            if (!localUser.token) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/auth/me`, {
+                    headers: { "Authorization": `Bearer ${localUser.token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    localUser.id = data.id;
+                    localUser.username = data.username;
+                    updateAccountUI();
+                }
+            } catch (e) {}
+        }
+
+        function updateAccountUI() {
+            const accInfo = document.getElementById("account-info");
+            const openBtn = document.getElementById("open-auth-btn");
+            if (accInfo) accInfo.innerText = `LOGGED IN: ${localUser.username.toUpperCase()}`;
+            if (openBtn) openBtn.innerText = "SIGN OUT";
+        }
+
+        function appendChatMessage(channel, sender, text) {
+            const box = document.getElementById("chat-messages");
+            if (!box) return;
+            const msgEl = document.createElement("div");
+            msgEl.className = "chat-msg";
+            msgEl.innerHTML = `<span class="sender">[${channel}] ${sender}:</span> ${text}`;
+            box.appendChild(msgEl);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById("chat-input");
+            if (!input) return;
+            const text = input.value.trim();
+            if (!text) return;
+
+            input.value = "";
+            if (activeChannel === "room" && roomSocket && roomSocket.readyState === WebSocket.OPEN) {
+                roomSocket.send(JSON.stringify({ type: "chat", content: text }));
+            } else if (globalSocket && globalSocket.readyState === WebSocket.OPEN) {
+                globalSocket.send(JSON.stringify({ type: "chat", username: localUser.username, content: text }));
+            } else {
+                appendChatMessage("LOCAL", localUser.username, text);
+            }
+        }
+
+        async function fetchRoomList() {
+            if (!isBackendOnline) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/rooms`);
+                const data = await res.json();
+                renderRoomList(data.rooms || []);
+            } catch (e) {}
+        }
+
+        function renderRoomList(rooms) {
+            const container = document.getElementById("room-list");
+            if (!container) return;
+            if (!rooms || rooms.length === 0) {
+                container.innerHTML = `<div style="font-size:11px; color:#94a3b8;">No active multiplayer rooms. Click Host Room!</div>`;
+                return;
+            }
+            container.innerHTML = rooms.map(r => `
+                <div class="room-item">
+                    <div>
+                        <span style="font-weight:700; color:#00f0ff;">${r.host}'s Room</span>
+                        <span style="font-size:10px; color:#94a3b8; margin-left:6px;">(${r.map.toUpperCase()})</span>
+                    </div>
+                    <button class="btn-sm" onclick="joinMultiplayerRoom('${r.roomId}', '${r.map}')">JOIN (${r.playerCount})</button>
+                </div>
+            `).join("");
+        }
+
+        function joinMultiplayerRoom(roomId, mapId) {
+            currentRoomId = roomId;
+            STATE.selectedMap = mapId;
+            selectMap(mapId);
+
+            if (roomSocket) {
+                roomSocket.close();
+                roomSocket = null;
+            }
+
+            if (!isBackendOnline) {
+                alert("Backend server offline. Starting single-player match.");
+                startGame();
+                return;
+            }
+
+            try {
+                const wsUrl = `${WS_BASE}/ws/room/${roomId}/${localPlayerId}/${encodeURIComponent(localUser.username)}/${mapId}`;
+                roomSocket = new WebSocket(wsUrl);
+
+                roomSocket.onopen = () => {
+                    appendChatMessage("ROOM", "SYSTEM", `Joined Room ${roomId} (${mapId.toUpperCase()})`);
+                    startGame();
+                };
+
+                roomSocket.onmessage = (event) => {
+                    const msg = JSON.parse(event.data);
+                    handleRoomNetworkMessage(msg);
+                };
+
+                roomSocket.onclose = () => {
+                    roomSocket = null;
+                    clearRemotePlayers();
+                };
+            } catch (e) {
+                startGame();
+            }
+        }
+
+        window.joinMultiplayerRoom = joinMultiplayerRoom;
+
+        function handleRoomNetworkMessage(msg) {
+            const type = msg.type;
+
+            if (type === "pos") {
+                updateRemotePlayerTransform(msg.playerId, msg.username, msg.x, msg.y, msg.z, msg.yaw, msg.pitch);
+            } else if (type === "shoot") {
+                const origin = new THREE.Vector3(msg.origin.x, msg.origin.y, msg.origin.z);
+                const dir = new THREE.Vector3(msg.dir.x, msg.dir.y, msg.dir.z);
+                createLaser(origin, dir, msg.color || 0x00f0ff, msg.speed || 90, false, msg.damage || 25);
+                audio.playShoot('pulse');
+            } else if (type === "player_left") {
+                removeRemotePlayer(msg.playerId);
+                addKillFeed(`${msg.username} left the room.`);
+            } else if (type === "chat") {
+                appendChatMessage("ROOM", msg.username, msg.content);
+            }
+        }
+
+        function updateRemotePlayerTransform(pId, pName, x, y, z, yawVal, pitchVal) {
+            if (!remotePlayers[pId]) {
+                const pGroup = new THREE.Group();
+                const pMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x00f0ff, emissiveIntensity: 1.5, roughness: 0.2 });
+                const body = new THREE.Mesh(new THREE.BoxGeometry(0.65, 1.4, 0.4), pMat);
+                body.position.y = 0.9;
+                pGroup.add(body);
+
+                const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 16), pMat);
+                head.position.y = 1.7;
+                pGroup.add(head);
+
+                const light = new THREE.PointLight(0x00f0ff, 2, 10);
+                light.position.y = 1.4;
+                pGroup.add(light);
+
+                pGroup.position.set(x, y - 1.6, z);
+                scene.add(pGroup);
+
+                remotePlayers[pId] = {
+                    mesh: pGroup,
+                    username: pName,
+                    targetPos: new THREE.Vector3(x, y - 1.6, z),
+                    targetYaw: yawVal
+                };
+            } else {
+                const rp = remotePlayers[pId];
+                rp.targetPos.set(x, y - 1.6, z);
+                rp.targetYaw = yawVal;
+            }
+        }
+
+        function removeRemotePlayer(pId) {
+            if (remotePlayers[pId]) {
+                scene.remove(remotePlayers[pId].mesh);
+                delete remotePlayers[pId];
+            }
+        }
+
+        function clearRemotePlayers() {
+            Object.keys(remotePlayers).forEach(pId => removeRemotePlayer(pId));
+        }
+
+        async function fetchFriendsList() {
+            if (!isBackendOnline || !localUser.token) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/friends`, {
+                    headers: { "Authorization": `Bearer ${localUser.token}` }
+                });
+                const data = await res.json();
+                renderFriendsList(data.friends || []);
+            } catch (e) {}
+        }
+
+        function renderFriendsList(friends) {
+            const container = document.getElementById("friends-list");
+            if (!container) return;
+            if (!friends || friends.length === 0) {
+                container.innerHTML = `<div style="font-size:11px; color:#94a3b8;">No friends added yet. Click + ADD!</div>`;
+                return;
+            }
+            container.innerHTML = friends.map(f => `
+                <div class="friend-item">
+                    <div>
+                        <span style="color:${f.is_online ? '#00ff88' : '#94a3b8'}; font-weight:700;">● ${f.username}</span>
+                    </div>
+                    <span style="font-size:10px; color:#94a3b8;">${f.is_online ? 'ONLINE' : 'OFFLINE'}</span>
+                </div>
+            `).join("");
+        }
+
+        async function promptAddFriend() {
+            if (!localUser.token) return alert("Please login to add friends.");
+            const fname = prompt("Enter friend's username:");
+            if (!fname) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/friends/add`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${localUser.token}`
+                    },
+                    body: JSON.stringify({ friend_username: fname })
+                });
+                const data = await res.json();
+                alert(data.message || data.detail);
+                fetchFriendsList();
+            } catch (e) {
+                alert("Failed to add friend.");
+            }
+        }
+
+        // Initialize UI Network Event Listeners
+        setTimeout(() => {
+            checkBackendHealth();
+
+            const openAuthBtn = document.getElementById("open-auth-btn");
+            if (openAuthBtn) {
+                openAuthBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    if (localUser.token) {
+                        localStorage.removeItem("cybertag_token");
+                        localUser.token = null;
+                        localUser.username = "Player_" + Math.floor(Math.random() * 8999 + 1000);
+                        document.getElementById("account-info").innerText = "GUEST PLAYER";
+                        openAuthBtn.innerText = "LOGIN / REGISTER";
+                        alert("Signed out.");
+                    } else {
+                        document.getElementById("auth-modal").classList.remove("hidden");
+                    }
+                });
+            }
+
+            const closeAuthBtn = document.getElementById("close-auth-btn");
+            if (closeAuthBtn) {
+                closeAuthBtn.addEventListener("click", () => {
+                    document.getElementById("auth-modal").classList.add("hidden");
+                });
+            }
+
+            const loginBtn = document.getElementById("auth-submit-login");
+            if (loginBtn) loginBtn.addEventListener("click", () => handleAuth("login"));
+
+            const regBtn = document.getElementById("auth-submit-reg");
+            if (regBtn) regBtn.addEventListener("click", () => handleAuth("register"));
+
+            const createRoomBtn = document.getElementById("create-room-btn");
+            if (createRoomBtn) {
+                createRoomBtn.addEventListener("click", () => {
+                    const newRoomId = "room_" + Math.random().toString(36).substr(2, 6);
+                    joinMultiplayerRoom(newRoomId, STATE.selectedMap || "fortress");
+                });
+            }
+
+            const addFriendBtn = document.getElementById("add-friend-btn");
+            if (addFriendBtn) addFriendBtn.addEventListener("click", promptAddFriend);
+
+            const chatSendBtn = document.getElementById("chat-send-btn");
+            if (chatSendBtn) chatSendBtn.addEventListener("click", sendChatMessage);
+
+            const chatInput = document.getElementById("chat-input");
+            if (chatInput) {
+                chatInput.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter") {
+                        sendChatMessage();
+                    }
+                });
+            }
+
+            const tabGlobal = document.getElementById("tab-global");
+            const tabRoom = document.getElementById("tab-room");
+            if (tabGlobal && tabRoom) {
+                tabGlobal.addEventListener("click", () => {
+                    activeChannel = "global";
+                    tabGlobal.classList.add("active");
+                    tabRoom.classList.remove("active");
+                });
+                tabRoom.addEventListener("click", () => {
+                    activeChannel = "room";
+                    tabRoom.classList.add("active");
+                    tabGlobal.classList.remove("active");
+                });
+            }
+        }, 100);
+
+        /* -------------------------------------------------------------
+         * GAME FLOW & EVENT LISTENERS
+         * ------------------------------------------------------------- */
+        document.querySelectorAll('.map-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const mapId = card.getAttribute('data-map');
+                if (mapId) selectMap(mapId);
+            });
+        });
+
+        const startBtn = document.getElementById('start-btn');
+        if (startBtn) {
+            startBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                startGame();
+            });
+        }
+
+        const restartBtn = document.getElementById('restart-btn');
+        if (restartBtn) {
+            restartBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                startGame();
+            });
+        }
+
+        function startGame() {
+            audio.init();
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+
+            STATE.isPlaying = true;
+            STATE.score = 0;
+            STATE.tags = 0;
+            STATE.shotsFired = 0;
+            STATE.shotsHit = 0;
+            STATE.wave = 1;
+            STATE.player.health = 100;
+            STATE.player.shield = 100;
+            STATE.player.isGrounded = true;
+            STATE.player.vel.set(0, 0, 0);
+            STATE.player.height = 1.6;
+            STATE.player.targetHeight = 1.6;
+
+            camera.position.set(0, 1.6, 0);
+            yaw = 0; pitch = 0;
+
+            // Clear old bots & lasers
+            bots.forEach(b => scene.remove(b.mesh));
+            bots.length = 0;
+            lasers.forEach(l => scene.remove(l.mesh));
+            lasers.length = 0;
+
+            // Build selected map arena
+            buildArena(STATE.selectedMap || 'fortress');
+
+            spawnWave(2);
+            updateHUD();
+            tryPointerLock();
+        }
+
+        function gameOver() {
+            STATE.isPlaying = false;
+            document.exitPointerLock();
+
+            document.getElementById('end-tags').innerText = STATE.tags;
+            document.getElementById('end-score').innerText = STATE.score;
+            const acc = STATE.shotsFired > 0 ? Math.round((STATE.shotsHit / STATE.shotsFired) * 100) : 0;
+            document.getElementById('end-acc').innerText = `${acc}%`;
+
+            document.getElementById('gameover-screen').classList.remove('hidden');
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Kick off main render loop
+        animate();
+    </script>
+</body>
+</html>
